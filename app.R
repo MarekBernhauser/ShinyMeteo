@@ -1,17 +1,10 @@
 library(shiny)
 library(dygraphs)
-library(lubridate)
 
 ### UI
 ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
-      fileInput("boundaryFile", "Choose CSV File",
-                accept = c(
-                  "text/csv",
-                  "text/comma-separated-values,text/plain",
-                  ".csv")
-      ),
       selectInput("stationType", label = "Select ecosystem station", 
                   choices = c("Agroecosystem at Křešín u Pacova with crops harvested during the growing season",
                               "Evergreen needleleaf forest at Rájec-Jestřebí representing monoculture of Norway spruce",
@@ -54,6 +47,7 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, clientData, session) {
+  ### Choices for input files in dropdown menu
   getChoices <- reactive({
     switch (input$stationType,
        "Agroecosystem at Křešín u Pacova with crops harvested during the growing season" = c("KRP daily data", "KRP half-hourly data", "KRP monthly data", "KRP weekly data"),
@@ -70,7 +64,6 @@ server <- function(input, output, clientData, session) {
   output$plot <- renderDygraph({
     second_axis <- set_second_axis(input$single_axis)  #'y2', or NULL if no second axis
     
-    #inFile <- input$boundaryFile
     inFile <- getInputFile()
     req(inFile)
     
@@ -135,7 +128,7 @@ server <- function(input, output, clientData, session) {
     }
   })
   
-  
+  ### Loading of data files
   getInputFile <- function() {  
     req(input$selectedFile)
     inFile <- NULL
