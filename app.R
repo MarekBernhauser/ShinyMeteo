@@ -155,35 +155,6 @@ server <- function(input, output, clientData, session) {
     )
     return(inFile) 
   }
-
-  
-  # ### Point Click
-  # output$point <- renderText({
-  #   inFile <- input$boundaryFile
-  #   req(input$plot_click)
-  #   meteo_data <- read.csv(inFile$datapath, sep = ",", header = TRUE)
-  #   meteo_data <- meteo_data[-1,]
-  #   if(!is.numeric(input$plot_click$x_closest_point)){  #if graphType is Time, closest point is day, and time comes out of nowhere, so it has to be removed
-  #     split_string <- unlist(strsplit(input$plot_click$x_closest_point, "T"))   #spliting date from time
-  #     my_row <- which(meteo_data$day == split_string[1], arr.ind = TRUE) #looking up matching day
-  #     
-  #   } else{
-  #     my_row <- which(meteo_data[input$col1ID] == input$plot_click$x_closest_point) #looking up matching rows  
-  #   }
-  #   my_string <- vector()
-  #   
-  #   for (weird_row_num in my_row) {
-  #     my_rown_numb <- rownames(meteo_data)[weird_row_num] #renames weird row number to actual row number
-  #     singleRow <- meteo_data[my_rown_numb,] #gets the entire row
-  # 
-  #     tmp_string <- paste("Date= ", singleRow$day, "; Tair= ", singleRow$Tair, "; Tsoil= ", singleRow$Tsoil, "; RH= ", singleRow$RH,
-  #                         "; VPD= ", singleRow$VPD, "; NEE_uStar_fqc= ", singleRow$NEE_uStar_fqc, "; P= ", singleRow$P, "; GR= ", singleRow$GR, "; Rn= ", singleRow$Rn, "; PAR= ", singleRow$PAR,
-  #                         "; H_f= ", singleRow$H_f, "; LE_f= ", singleRow$LE_f, "; Reco_uStar= ", singleRow$Reco_uStar, "; GPP_uStar_f= ", singleRow$GPP_uStar_f)
-  #     
-  #     my_string <- append(my_string, tmp_string)
-  #   }
-  #   paste0(my_string)
-  # })
   
   ### Remove label
   observe({
