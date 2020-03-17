@@ -22,14 +22,9 @@ ui <- fluidPage(
         condition = "input.graphType == 'Time'",
         checkboxInput("single_axis", label = "Display on single y-axis", value = FALSE)
       ),
-      conditionalPanel(
-        #condition = "input.graphType == 'XY' && input.dateSelect == 'TRUE'",
-        condition = "input.graphType == 'XY'",
-        dateRangeInput("boundary_date", label = "Date range", startview = "year", start = "", end = "")
-      ),
-      conditionalPanel(
-        condition = "input.graphType == 'XY'",
-        sliderInput("boundary_set", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)),
+      
+      uiOutput("showTimeDateSelect"),
+      uiOutput("showNumSelect"),
       
       checkboxInput("show_label", label = "Show label", value = FALSE),
       conditionalPanel(
@@ -47,6 +42,7 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, clientData, session) {
+  
   ### Choices for input files in dropdown menu
   getChoices <- reactive({
     switch (input$stationType,
@@ -58,6 +54,19 @@ server <- function(input, output, clientData, session) {
   
   output$station <- renderUI({
     selectInput("selectedFile", "Select desired temporal reslution", choices = getChoices())
+  })
+  
+  #TODO fix
+  output$showTimeDateSelect <- renderUI({
+    if (input$graphType == "XY") {
+      dateRangeInput("boundary_date", label = "Date range", startview = "year", start = "", end = "")
+    }
+  })
+  
+  output$showNumSelect <- renderUI({ 
+    if (input$graphType == "XY") {
+      sliderInput("boundary_set", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)
+    }
   })
   
   ### Plot Create
@@ -73,31 +82,33 @@ server <- function(input, output, clientData, session) {
     meteo_data <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
     colnames(meteo_data) = headers
     
-    if (FALSE) {
-      update_boundary_dates(min(levels(meteo_data[,1])), max(levels(meteo_data[,1]))) 
-      startDate = input$boundary_date[1]
-      req(startDate)
-      endDate = input$boundary_date[2]
-      req(endDate)
-      req(endDate > startDate)
-      
-      all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-      #TODO time
-      meteo_data <- meteo_data[(as.Date(levels(meteo_data$time)) %in% all_dates),]
-    } else {
-      minValue <- min(meteo_data[1])
-      maxValue <- max(meteo_data[1])
-      update_boundary_set(minValue, maxValue)
-      startDate = input$boundary_set[1]
-      req(startDate)
-      endDate = input$boundary_set[2]
-      req(endDate)
-      req(endDate > startDate)
-      
-      all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-      #TODO time
-      meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
-    }
+    possibleToParseDate <- isDateBased(meteo_data[1, 1])
+    
+      if (possibleToParseDate) {
+        update_boundary_dates(min(levels(meteo_data[,1])), max(levels(meteo_data[,1]))) 
+        startDate = input$boundary_date[1]
+        req(startDate)
+        endDate = input$boundary_date[2]
+        req(endDate)
+        req(endDate > startDate)
+        
+        all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
+        #TODO time
+        meteo_data <- meteo_data[(as.Date(levels(meteo_data$time)) %in% all_dates),]
+      } else {
+        minValue <- min(meteo_data[1])
+        maxValue <- max(meteo_data[1])
+        update_boundary_set(minValue, maxValue)
+        startDate = input$boundary_set[1]
+        req(startDate)
+        endDate = input$boundary_set[2]
+        req(endDate)
+        req(endDate > startDate)
+        
+        all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
+        #TODO time
+        meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
+      }
     
 
     meteo_data <- meteo_data[order(meteo_data[input$col1ID]),]    #reorder to ascending order, required by dygraphs
@@ -176,6 +187,15 @@ server <- function(input, output, clientData, session) {
     
     req(input$boundary_set[1] && input$boundary_set[2])
   }
+  
+  isDateBased <- function(testDate) {
+    resTestDate <- try(as.Date(testDate)) #TODO throws error but works as intended
+    if (class(resTestDate) == "try-error") {
+      return(FALSE) 
+    }
+    return(TRUE)
+  }
+  
 }
 
 set_second_axis <- function(input){
