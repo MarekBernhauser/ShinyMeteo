@@ -3,8 +3,10 @@ library(dygraphs)
 
 ### UI
 ui <- fluidPage(
+  titlePanel("Visualization of eddy-covariance data "),
   sidebarLayout(
     sidebarPanel(
+      h4("Data from three different ecosystem stations for year 2016 are available in four temporal resolutions"),
       selectInput("stationType", label = "Select ecosystem station", 
                   choices = c("Agroecosystem at Křešín u Pacova with crops harvested during the growing season",
                               "Evergreen needleleaf forest at Rájec-Jestřebí representing monoculture of Norway spruce",
@@ -79,6 +81,7 @@ server <- function(input, output, clientData, session) {
     
     if(input$graphType == "XY"){    #XY graph
     headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE)
+    units <- read.csv(inFile, sep = ",", header = TRUE, nrows = 1, as.is = TRUE)
     meteo_data <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
     colnames(meteo_data) = headers
     
@@ -109,28 +112,28 @@ server <- function(input, output, clientData, session) {
         #TODO time
         meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
       }
-    
 
     meteo_data <- meteo_data[order(meteo_data[input$col1ID]),]    #reorder to ascending order, required by dygraphs
     req(dim(meteo_data)[1] > 0)
     
     dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
       dyRangeSelector() %>%
-      dyAxis("x", label = input$col1ID) %>%
-      dyAxis("y", label = input$col2ID) %>%
+      dyAxis("x", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = "")) %>%
+      dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = "")) %>%
       dyOptions(drawPoints = TRUE, pointSize = 3, strokeWidth = 0, animatedZooms = TRUE) %>%
       dyHighlight(highlightCircleSize = 5) %>%
       dyLimit(input$y_axis_label, color = "red")
     }
     else if(input$graphType == "Time"){   #Time graph
       headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
+      units <- read.csv(inFile, sep = ",", header = TRUE, nrows = 1, as.is = TRUE)
       meteo_data <- read.csv(inFile, sep = ",", header = FALSE, row.names = 1, skip = 2)
       colnames(meteo_data) = headers
       
       dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
         dyRangeSelector() %>%
-        dyAxis("y", label = input$col2ID, independentTicks  = TRUE) %>%
-        dyAxis("y2", label = input$col1ID, independentTicks = TRUE) %>%
+        dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
+        dyAxis("y2", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = ""), independentTicks = TRUE) %>%
         dySeries(input$col1ID, axis = second_axis) %>%
         dyOptions(animatedZooms = TRUE) %>%
         dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2)) %>%
@@ -184,7 +187,6 @@ server <- function(input, output, clientData, session) {
     if(input$boundary_set[1] == -1) {
       updateSliderInput(session, "boundary_set", min = 1, max = to, value = c(1 , to))  
     }
-    
     req(input$boundary_set[1] && input$boundary_set[2])
   }
   
