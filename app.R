@@ -14,12 +14,9 @@ ui <- fluidPage(
                               "Deciduous broadleaf forests at Štítná nad Vláří representing monoculture of European beech")),
       uiOutput("station"),
       radioButtons("graphType","Graph type", c("XY", "Time")),
-      selectInput("col1ID", label = "X-axis",
-                  choices = c("Tair", "Tsoil", "RH", "VPD", "NEE_uStar_fqc", "P", "GR", "Rn", "PAR", "H_f", "LE_f", "Reco_uStar", "GPP_uStar_f"),
-                  selected = "Tair"),
-      selectInput("col2ID", label = "Y-axis",
-                  choices = c("Tair", "Tsoil", "RH", "VPD", "NEE_uStar_fqc", "P", "GR", "Rn", "PAR", "H_f", "LE_f", "Reco_uStar", "GPP_uStar_f"),
-                  selected = "Tsoil"),
+      uiOutput("col1"),
+      uiOutput("col2"),
+      
       hr(),
       conditionalPanel(
         condition = "input.graphType == 'Time'",
@@ -69,6 +66,26 @@ server <- function(input, output, clientData, session) {
     if (input$graphType == "XY" && getInputFile()[2] == "weekly") {
       sliderInput("boundary_set", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)
     }
+  })
+  
+  ### Get choices for x axis
+  output$col1 <- renderUI({
+    inFile <- getInputFile()[1]
+    req(inFile)
+    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE)
+    selectInput("col1ID", label = "X-axis",
+                choices = as.character(as.vector(headers[1,])),
+                selected = "Tair")
+  })
+  
+  ### Get choices for y axis
+  output$col2 <- renderUI({
+    inFile <- getInputFile()[1]
+    req(inFile)
+    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE)
+    selectInput("col2ID", label = "Y-axis",
+      choices = as.character(as.vector(headers[1,])),
+      selected = "Tsoil")
   })
   
   ### Plot Create
@@ -131,6 +148,7 @@ server <- function(input, output, clientData, session) {
       units <- read.csv(inFile, sep = ",", header = TRUE, nrows = 1, as.is = TRUE)
       meteo_data <- read.csv(inFile, sep = ",", header = FALSE, row.names = 1, skip = 2)
       colnames(meteo_data) = headers
+      req(input$col1ID != input$col2ID)
       
       dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
         dyRangeSelector() %>%
