@@ -1,5 +1,6 @@
 library(shiny)
 library(dygraphs)
+library(lubridate)
 
 ### UI
 ui <- fluidPage(
@@ -191,11 +192,10 @@ server <- function(input, output, clientData, session) {
   }
   
   isDateBased <- function(testDate) {
-    resTestDate <- try(as.Date(testDate)) #TODO throws error but works as intended
-    if (class(resTestDate) == "try-error") {
-      return(FALSE) 
+    if (!is.numeric(testDate)) {
+      return(TRUE) 
     }
-    return(TRUE)
+    return(FALSE)
   }
   
 }
