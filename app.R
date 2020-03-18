@@ -42,11 +42,19 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, clientData, session) {
-  ### Multicolumn support
+  ### Multicolumn barchart support
   dyMultiColumn <- function(dygraph) {
     dyPlotter(dygraph = dygraph,
               name = "MultiColumn",
               path = system.file("plotters/multicolumn.js",
+                                 package = "dygraphs"))
+  }
+  
+  ### Barchart support
+  dyBarChart <- function(dygraph) {
+    dyPlotter(dygraph = dygraph,
+              name = "BarChart",
+              path = system.file("plotters/barchart.js",
                                  package = "dygraphs"))
   }
   
@@ -70,7 +78,7 @@ server <- function(input, output, clientData, session) {
   })
   
   output$showNumSelect <- renderUI({ 
-    if (input$graphType == "XY" && getInputFile()[2] == "weekly") {
+    if (input$graphType == "XY" && getInputFile()[2] %in% c("weekly", "monthly")) {
       sliderInput("boundary_set", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)
     }
   })
@@ -120,7 +128,7 @@ server <- function(input, output, clientData, session) {
         req(endDate > startDate)
         
         all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-        #TODO time
+        #TODO time can be replaced with meteo_data[,1] 
         meteo_data <- meteo_data[(as.Date(levels(meteo_data$time)) %in% all_dates),]
       } else {
         minValue <- min(meteo_data[1])
@@ -133,7 +141,7 @@ server <- function(input, output, clientData, session) {
         req(endDate > startDate)
         
         all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-        #TODO time
+        #TODO time can be replaced with meteo_data[,1] 
         meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
       }
     
@@ -142,13 +150,26 @@ server <- function(input, output, clientData, session) {
     meteo_data <- meteo_data[order(meteo_data[input$col1ID]),]    #reorder to ascending order, required by dygraphs
     req(dim(meteo_data)[1] > 0)
     
-    dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
-      dyRangeSelector() %>%
-      dyAxis("x", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = "")) %>%
-      dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = "")) %>%
-      dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0, animatedZooms = TRUE) %>%
-      dyHighlight(highlightCircleSize = 5) %>%
-      dyLimit(input$y_axis_label, color = "red")
+    dataType <- getInputFile()[2]
+    if (dataType != "monthly"){ #TODO reformat
+      dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
+        dyRangeSelector() %>%
+        dyAxis("x", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = "")) %>%
+        dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = "")) %>%
+        dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0, animatedZooms = TRUE) %>%
+        dyHighlight(highlightCircleSize = 5) %>%
+        dyLimit(input$y_axis_label, color = "red")
+    } else {
+      dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
+        dyRangeSelector() %>%
+        dyAxis("x", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = "")) %>%
+        dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = "")) %>%
+        dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 8, animatedZooms = TRUE) %>%
+        dyHighlight(highlightCircleSize = 5) %>%
+        dyLimit(input$y_axis_label, color = "red") %>%
+        dyBarChart()
+    }
+
     }
     else if(input$graphType == "Time"){   #Time graph
       headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
@@ -233,7 +254,7 @@ server <- function(input, output, clientData, session) {
   }
   
   ### Update boudnary set
-  update_boundary_set <- function(from,to) {   
+  update_boundary_set <- function(from,to) { 
     if(is.null(input$boundary_set[1]) || input$boundary_set[1] == -1) {
       updateSliderInput(session, "boundary_set", min = 1, max = to, value = c(1 , to))  
     }
