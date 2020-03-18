@@ -150,7 +150,16 @@ server <- function(input, output, clientData, session) {
       colnames(meteo_data) = headers
       req(input$col1ID != input$col2ID)
       
-      dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
+      dataType <- getInputFile()[2]
+      if (dataType == "weekly") {  #TODO reformat
+        tab <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
+        dates <- tab[,1]
+        final <- cbind(dates,meteo_data[input$col1ID],meteo_data[input$col2ID])
+      } else {
+        final <- cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])
+      }
+      
+      dygraph(final) %>%
         dyRangeSelector() %>%
         dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
         dyAxis("y2", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = ""), independentTicks = TRUE) %>%
