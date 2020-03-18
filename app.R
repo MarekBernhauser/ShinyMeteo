@@ -42,6 +42,13 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, clientData, session) {
+  ### Multicolumn support
+  dyMultiColumn <- function(dygraph) {
+    dyPlotter(dygraph = dygraph,
+              name = "MultiColumn",
+              path = system.file("plotters/multicolumn.js",
+                                 package = "dygraphs"))
+  }
   
   ### Choices for input files in dropdown menu
   getChoices <- reactive({
@@ -151,7 +158,7 @@ server <- function(input, output, clientData, session) {
       req(input$col1ID != input$col2ID)
       
       dataType <- getInputFile()[2]
-      if (dataType == "weekly") {  #TODO reformat
+      if (dataType == "weekly" || dataType == "monthly") {  #TODO reformat
         tab <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
         dates <- tab[,1]
         final <- cbind(dates,meteo_data[input$col1ID],meteo_data[input$col2ID])
@@ -159,15 +166,29 @@ server <- function(input, output, clientData, session) {
         final <- cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])
       }
       
-      dygraph(final) %>%
-        dyRangeSelector() %>%
-        dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
-        dyAxis("y2", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = ""), independentTicks = TRUE) %>%
-        dySeries(input$col1ID, axis = second_axis) %>%
-        dyOptions(animatedZooms = TRUE) %>%
-        dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2)) %>%
-        dyLegend(show = "always") %>%
-        dyLimit(input$y_axis_label, color = "red")
+      if (dataType != "monthly"){ #TODO reformat
+        dygraph(final) %>%
+          dyRangeSelector() %>%
+          dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
+          dyAxis("y2", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = ""), independentTicks = TRUE) %>%
+          dySeries(input$col1ID, axis = second_axis) %>%
+          dyOptions(animatedZooms = TRUE) %>%
+          dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2)) %>%
+          dyLegend(show = "always") %>%
+          dyLimit(input$y_axis_label, color = "red")
+      } else {
+         dygraph(final) %>%
+          dyRangeSelector() %>%
+          dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
+          dyAxis("y2", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = ""), independentTicks = TRUE) %>%
+          dySeries(input$col1ID, axis = second_axis) %>%
+          dyOptions(animatedZooms = TRUE) %>%
+          dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2)) %>%
+          dyLegend(show = "always") %>%
+          dyLimit(input$y_axis_label, color = "red") %>%
+          dyMultiColumn()
+      }
+
     }
   })
   
