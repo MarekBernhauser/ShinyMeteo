@@ -72,7 +72,7 @@ server <- function(input, output, clientData, session) {
   output$col1 <- renderUI({
     inFile <- getInputFile()[1]
     req(inFile)
-    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE)
+    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
     selectInput("col1ID", label = "X-axis",
                 choices = as.character(as.vector(headers[1,])),
                 selected = "Tair")
@@ -82,7 +82,7 @@ server <- function(input, output, clientData, session) {
   output$col2 <- renderUI({
     inFile <- getInputFile()[1]
     req(inFile)
-    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE)
+    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
     selectInput("col2ID", label = "Y-axis",
       choices = as.character(as.vector(headers[1,])),
       selected = "Tsoil")
