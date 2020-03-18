@@ -62,7 +62,7 @@ server <- function(input, output, clientData, session) {
   #TODO fix
   output$showTimeDateSelect <- renderUI({
     if (input$graphType == "XY") {
-      dateRangeInput("boundary_date", label = "Date range", startview = "year", start = "", end = "")
+      dateRangeInput("boundary_date", label = "Date range", startview = "year", start = "1971-01-01", end = "1971-01-01")
     }
   })
   
@@ -173,14 +173,15 @@ server <- function(input, output, clientData, session) {
   
   ### Update boudnary dates
   update_boundary_dates <- function(from,to) {   
-    updateDateRangeInput(session, "boundary_date", min = from, max = to)
-    if(is.na(input$boundary_date[1])) updateDateRangeInput(session, "boundary_date", start = from)
-    if(is.na(input$boundary_date[2])) updateDateRangeInput(session, "boundary_date", end = to)
+    if(is.na(input$boundary_date[1]) || input$boundary_date[1] == "1971-01-01") updateDateRangeInput(session, "boundary_date", start = from)
+    if(is.na(input$boundary_date[2]) || input$boundary_date[2] == "1971-01-01") updateDateRangeInput(session, "boundary_date", end = to)
     req(input$boundary_date[1] && input$boundary_date[2])
     if (input$boundary_date[1] > input$boundary_date[2]) {  #swap endDate and startDate if startDate > endDate
       tmp <- input$boundary_date[1]
       updateDateRangeInput(session, "boundary_date", start = input$boundary_date[2], end = tmp)
     }
+    #this was above IFs in previous version, but for some reason in new version it wasn't working and has to be here
+    updateDateRangeInput(session, "boundary_date", min = from, max = to) 
   }
   
   ### Update boudnary set
