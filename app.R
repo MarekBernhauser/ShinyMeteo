@@ -36,7 +36,7 @@ ui <- fluidPage(
                      value = NULL, min = -9999, max = 9999, step = 1)
       ),
       hr(),
-      div(strong("Additional information: "), textOutput("point", inline = TRUE))
+      div(strong("Additional information: "), htmlOutput("point", inline = TRUE))
     ),
     mainPanel(
       dygraphOutput("plot")
@@ -198,6 +198,40 @@ server <- function(input, output, clientData, session) {
     }
     return(FALSE)
   }
+  
+  ### Additional indormation
+  output$point <- renderText({
+    if (getInputFile()[2] == "half-hourly") {
+      "<br><b>Tair-</b> Air temperature at the eddy-covariance measurement height <br>
+      <b>Tsoil-</b> Soil temperature at the soil surface <br>
+      <b>RH-</b> Relative humidity at the eddy-covariance measurement height <br> 
+      <b>VPD-</b> Vapor pressure dificit at the eddy-covariance measurement height <br> 
+      <b>P-</b> Precipitation at the eddy-covariance measurement height <br>
+      <b>GR-</b> Global radiation <br>
+      <b>Rn-</b> Net radiation <br>
+      <b>PAR-</b> Photosynthetic active radiation <br> 
+      <b>H-</b> Sensible heat flux <br>
+      <b>LE-</b> Latent heat flux <br> 
+      <b>NEE-</b> Net ecosystem exchange <br> 
+      <b>Reco-</b> Ecosystem respiration <br>
+      <b>GPP-</b> Gross primary production <br>"
+    } else {
+      "<br><b>Tair-</b> Mean air temperature at the eddy-covariance measurement height <br> 
+      <b>Tsoil-</b> Mean soil temperature at the soil surface <br>
+      <b>RH-</b> Mean relative humidity at the eddy-covariance measurement height <br>
+      <b>VPD-</b> Mean vapor pressure dificit at the eddy-covariance measurement height <br>
+      <b>P-</b> Sum of precipitation at the eddy-covariance measurement height <br>
+      <b>GR-</b> Sum of global radiation <br> 
+      <b>Rn-</b> Sum of net radiation <br>
+      <b>PAR-</b> Sum of photosynthetic active radiation <br> 
+      <b>H-</b> Sum of sensible heat flux <br>
+      <b>LE-</b> Sum of latent heat flux <br> 
+      <b>NEP-</b> Net ecosystem production <br>
+      <b>Reco-</b> Sum of ecosystem respiration <br>
+      <b>GPP-</b> Sum of gross primary production <br>"
+    }
+  })
+  
 }
 
 set_second_axis <- function(input){
