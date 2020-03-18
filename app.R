@@ -59,15 +59,14 @@ server <- function(input, output, clientData, session) {
     selectInput("selectedFile", "Select desired temporal reslution", choices = getChoices())
   })
   
-  #TODO fix
   output$showTimeDateSelect <- renderUI({
-    if (input$graphType == "XY") {
+    if (input$graphType == "XY" && getInputFile()[2] %in% c("daily", "half-hourly")) {
       dateRangeInput("boundary_date", label = "Date range", startview = "year", start = "1971-01-01", end = "1971-01-01")
     }
   })
   
   output$showNumSelect <- renderUI({ 
-    if (input$graphType == "XY") {
+    if (input$graphType == "XY" && getInputFile()[2] == "weekly") {
       sliderInput("boundary_set", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)
     }
   })
@@ -76,7 +75,7 @@ server <- function(input, output, clientData, session) {
   output$plot <- renderDygraph({
     second_axis <- set_second_axis(input$single_axis)  #'y2', or NULL if no second axis
     
-    inFile <- getInputFile()
+    inFile <- getInputFile()[1]
     req(inFile)
     
     
@@ -113,7 +112,9 @@ server <- function(input, output, clientData, session) {
         #TODO time
         meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
       }
-
+    
+    if (nrow(meteo_data) > 1000) graphPointSize <- 2 else graphPointSize <- 3
+ 
     meteo_data <- meteo_data[order(meteo_data[input$col1ID]),]    #reorder to ascending order, required by dygraphs
     req(dim(meteo_data)[1] > 0)
     
@@ -121,7 +122,7 @@ server <- function(input, output, clientData, session) {
       dyRangeSelector() %>%
       dyAxis("x", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = "")) %>%
       dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = "")) %>%
-      dyOptions(drawPoints = TRUE, pointSize = 3, strokeWidth = 0, animatedZooms = TRUE) %>%
+      dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0, animatedZooms = TRUE) %>%
       dyHighlight(highlightCircleSize = 5) %>%
       dyLimit(input$y_axis_label, color = "red")
     }
@@ -143,23 +144,22 @@ server <- function(input, output, clientData, session) {
     }
   })
   
-  ### Loading of data files
+  ### Get location and type of input file
   getInputFile <- function() {  
     req(input$selectedFile)
-    inFile <- NULL
     switch (input$selectedFile,
-            "KRP daily data" = inFile <- "./data/KRP16 daily data.csv",
-            "KRP half-hourly data" = inFile <- "./data/KRP16 half-hourly data.csv",
-            "KRP monthly data" = inFile <- "./data/KRP16 monthly data.csv",
-            "KRP weekly data" = inFile <- "./data/KRP16 weekly data.csv",
-            "RAJ daily data" = inFile <- "./data/RAJ16 daily data.csv",
-            "RAJ half-hourly data" = inFile <- "./data/RAJ16 half-hourly data.csv",
-            "RAJ monthly data" = inFile <- "./data/RAJ16 monthly data.csv",
-            "RAJ weekly data" = inFile <- "./data/RAJ16 weekly data.csv",
-            "STI daily data" = inFile <- "./data/STI16 daily data.csv",
-            "STI half-hourly data" = inFile <- "./data/STI16 half-hourly data.csv",
-            "STI monthly data" = inFile <- "./data/STI16 monthly data.csv",
-            "STI weekly data" = inFile <- "./data/STI16 weekly data.csv"
+            "KRP daily data" = inFile <- c("./data/KRP16 daily data.csv", "daily"),
+            "KRP half-hourly data" = inFile <- c("./data/KRP16 half-hourly data.csv", "half-hourly"),
+            "KRP monthly data" = inFile <- c("./data/KRP16 monthly data.csv", "monthly"),
+            "KRP weekly data" = inFile <- c("./data/KRP16 weekly data.csv", "weekly"),
+            "RAJ daily data" = inFile <- c("./data/RAJ16 daily data.csv", "daily"),
+            "RAJ half-hourly data" = inFile <- c("./data/RAJ16 half-hourly data.csv", "half-hourly"),
+            "RAJ monthly data" = inFile <- c("./data/RAJ16 monthly data.csv", "monthly"),
+            "RAJ weekly data" = inFile <- c("./data/RAJ16 weekly data.csv", "weekly"),
+            "STI daily data" = inFile <- c("./data/STI16 daily data.csv", "daily"),
+            "STI half-hourly data" = inFile <- c("./data/STI16 half-hourly data.csv", "half-hourly"),
+            "STI monthly data" = inFile <- c("./data/STI16 monthly data.csv", "monthly"),
+            "STI weekly data" = inFile <- c("./data/STI16 weekly data.csv", "weekly")
     )
     return(inFile) 
   }
@@ -173,9 +173,9 @@ server <- function(input, output, clientData, session) {
   
   ### Update boudnary dates
   update_boundary_dates <- function(from,to) {   
-    if(is.na(input$boundary_date[1]) || input$boundary_date[1] == "1971-01-01") updateDateRangeInput(session, "boundary_date", start = from)
-    if(is.na(input$boundary_date[2]) || input$boundary_date[2] == "1971-01-01") updateDateRangeInput(session, "boundary_date", end = to)
-    req(input$boundary_date[1] && input$boundary_date[2])
+    if(is.null(input$boundary_date[1]) || is.na(input$boundary_date[1]) || input$boundary_date[1] == "1971-01-01") updateDateRangeInput(session, "boundary_date", start = from)
+    if(is.null(input$boundary_date[2]) || is.na(input$boundary_date[2]) || input$boundary_date[2] == "1971-01-01") updateDateRangeInput(session, "boundary_date", end = to)
+    req(input$boundary_date[1], input$boundary_date[2])
     if (input$boundary_date[1] > input$boundary_date[2]) {  #swap endDate and startDate if startDate > endDate
       tmp <- input$boundary_date[1]
       updateDateRangeInput(session, "boundary_date", start = input$boundary_date[2], end = tmp)
@@ -186,10 +186,10 @@ server <- function(input, output, clientData, session) {
   
   ### Update boudnary set
   update_boundary_set <- function(from,to) {   
-    if(input$boundary_set[1] == -1) {
+    if(is.null(input$boundary_set[1]) || input$boundary_set[1] == -1) {
       updateSliderInput(session, "boundary_set", min = 1, max = to, value = c(1 , to))  
     }
-    req(input$boundary_set[1] && input$boundary_set[2])
+    req(input$boundary_set[1], input$boundary_set[2])
   }
   
   isDateBased <- function(testDate) {
@@ -198,7 +198,6 @@ server <- function(input, output, clientData, session) {
     }
     return(FALSE)
   }
-  
 }
 
 set_second_axis <- function(input){
