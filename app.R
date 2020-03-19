@@ -149,6 +149,7 @@ server <- function(input, output, clientData, session) {
  
     meteo_data <- meteo_data[order(meteo_data[input$col1ID]),]    #reorder to ascending order, required by dygraphs
     req(dim(meteo_data)[1] > 0)
+    meteo_data <- removeInvalid(meteo_data)
     
     dataType <- getInputFile()[2]
     if (dataType != "monthly"){ #TODO reformat
@@ -178,6 +179,7 @@ server <- function(input, output, clientData, session) {
       colnames(meteo_data) = headers
       req(input$col1ID != input$col2ID)
       
+      meteo_data <- removeInvalid(meteo_data)
       dataType <- getInputFile()[2]
       if (dataType == "weekly" || dataType == "monthly") {  #TODO reformat
         tab <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
@@ -231,6 +233,13 @@ server <- function(input, output, clientData, session) {
             "STI weekly data" = inFile <- c("./data/STI16 weekly data.csv", "weekly")
     )
     return(inFile) 
+  }
+  
+  ### Remove invalid values
+  removeInvalid <- function(meteo_data) {
+    meteo_data[input$col1ID][meteo_data[input$col1ID] == -9999] <- NA
+    meteo_data[input$col2ID][meteo_data[input$col2ID] == -9999] <- NA
+    return(meteo_data)
   }
   
   ### Remove label
@@ -301,6 +310,7 @@ server <- function(input, output, clientData, session) {
     }
   })
   
+  session$onSessionEnded(stopApp)#TODO maybe
 }
 
 set_second_axis <- function(input){
