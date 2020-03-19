@@ -13,13 +13,13 @@ ui <- fluidPage(
                               "Evergreen needleleaf forest at Rájec-Jestřebí representing monoculture of Norway spruce",
                               "Deciduous broadleaf forests at Štítná nad Vláří representing monoculture of European beech")),
       uiOutput("station"),
-      radioButtons("graphType","Graph type", c("XY", "Time")),
+      radioButtons("graphType","Graph type", c("XY", "Time series")),
       uiOutput("col1"),
       uiOutput("col2"),
       
       hr(),
       conditionalPanel(
-        condition = "input.graphType == 'Time'",
+        condition = "input.graphType == 'Time series'",
         checkboxInput("single_axis", label = "Display on single y-axis", value = FALSE)
       ),
       
@@ -68,7 +68,7 @@ server <- function(input, output, clientData, session) {
   })
   
   output$station <- renderUI({
-    selectInput("selectedFile", "Select desired temporal reslution", choices = getChoices())
+    selectInput("selectedFile", "Temporal reslution", choices = getChoices())
   })
   
   output$showTimeDateSelect <- renderUI({
@@ -172,7 +172,7 @@ server <- function(input, output, clientData, session) {
     }
 
     }
-    else if(input$graphType == "Time"){   #Time graph
+    else if(input$graphType == "Time series"){   #Time series graph
       headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
       units <- read.csv(inFile, sep = ",", header = TRUE, nrows = 1, as.is = TRUE)
       meteo_data <- read.csv(inFile, sep = ",", header = FALSE, row.names = 1, skip = 2)
