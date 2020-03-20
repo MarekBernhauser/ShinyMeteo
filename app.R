@@ -88,7 +88,12 @@ server <- function(input, output, clientData, session) {
     inFile <- getInputFile()[1]
     req(inFile)
     headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
-    selectInput("col1ID", label = "X-axis",
+    if (input$graphType == "Time series") {
+      myLabel <- "Y-axis"
+    } else {
+      myLabel <- "X-axis"
+    }
+    selectInput("col1ID", label = myLabel,
                 choices = as.character(as.vector(headers[1,])),
                 selected = "Tair")
   })
@@ -98,28 +103,32 @@ server <- function(input, output, clientData, session) {
     inFile <- getInputFile()[1]
     req(inFile)
     headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
-    selectInput("col2ID", label = "Y-axis",
-      choices = as.character(as.vector(headers[1,])),
-      selected = "Tsoil")
+    if (input$graphType == "Time series") {
+      selectInput("col2ID", label = "Y2-axis",
+                  choices = append("Empty", as.character(as.vector(headers[1,]))),
+                  selected = "Tsoil")
+    } else {
+      selectInput("col2ID", label = "Y-axis",
+                  choices = as.character(as.vector(headers[1,])),
+                  selected = "Tsoil")
+    }
   })
   
   ### Plot Create
   output$plot <- renderDygraph({
     second_axis <- set_second_axis(input$single_axis)  #'y2', or NULL if no second axis
     
-    inFile <- getInputFile()[1]
+    fil <- getInputFile()
+    inFile <- fil[1]
+    dataType <- fil[2]
     req(inFile)
-    
+    headers <- read.csv(inFile, sep = ",", header = FALSE, nrows = 2, as.is = TRUE)
+    meteo_data <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
+    colnames(meteo_data) = headers[1,]
+    colnames(headers) <- headers[1,]
     
     if(input$graphType == "XY"){    #XY graph
-    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE)
-    units <- read.csv(inFile, sep = ",", header = TRUE, nrows = 1, as.is = TRUE)
-    meteo_data <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
-    colnames(meteo_data) = headers
-    
-    possibleToParseDate <- isDateBased(meteo_data[1, 1])
-    
-      if (possibleToParseDate) {
+      if (dataType == "daily" || dataType == "half-hourly") {
         update_boundary_dates(min(levels(meteo_data[,1])), max(levels(meteo_data[,1]))) 
         startDate = input$boundary_date[1]
         req(startDate)
@@ -128,12 +137,10 @@ server <- function(input, output, clientData, session) {
         req(endDate > startDate)
         
         all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-        #TODO time can be replaced with meteo_data[,1] 
+        #TODO time 
         meteo_data <- meteo_data[(as.Date(levels(meteo_data$time)) %in% all_dates),]
       } else {
-        minValue <- min(meteo_data[1])
-        maxValue <- max(meteo_data[1])
-        update_boundary_set(minValue, maxValue)
+        update_boundary_set(min(meteo_data[1]), max(meteo_data[1]))
         startDate = input$boundary_set[1]
         req(startDate)
         endDate = input$boundary_set[2]
@@ -141,77 +148,53 @@ server <- function(input, output, clientData, session) {
         req(endDate > startDate)
         
         all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-        #TODO time can be replaced with meteo_data[,1] 
+        #TODO time 
         meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
       }
-    
     if (nrow(meteo_data) > 1000) graphPointSize <- 2 else graphPointSize <- 3
- 
     meteo_data <- meteo_data[order(meteo_data[input$col1ID]),]    #reorder to ascending order, required by dygraphs
     req(dim(meteo_data)[1] > 0)
     meteo_data <- removeInvalid(meteo_data)
     
-    dataType <- getInputFile()[2]
-    if (dataType != "monthly"){ #TODO reformat
-      dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
-        dyRangeSelector() %>%
-        dyAxis("x", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = "")) %>%
-        dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = "")) %>%
-        dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0, animatedZooms = TRUE) %>%
-        dyHighlight(highlightCircleSize = 5) %>%
-        dyLimit(input$y_axis_label, color = "red")
-    } else {
-      dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
-        dyRangeSelector() %>%
-        dyAxis("x", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = "")) %>%
-        dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = "")) %>%
-        dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 8, animatedZooms = TRUE) %>%
-        dyHighlight(highlightCircleSize = 5) %>%
-        dyLimit(input$y_axis_label, color = "red") %>%
-        dyBarChart()
+    dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
+      dyRangeSelector() %>%
+      dyAxis("x", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = "")) %>%
+      dyAxis("y", label = paste(input$col2ID, " [" , headers[2, input$col2ID], "]", sep = "")) %>%
+      dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0, animatedZooms = TRUE) %>%
+      dyHighlight(highlightCircleSize = 5) %>%
+      dyLimit(input$y_axis_label, color = "red")
     }
-
-    }
+    
+    
     else if(input$graphType == "Time series"){   #Time series graph
-      headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
-      units <- read.csv(inFile, sep = ",", header = TRUE, nrows = 1, as.is = TRUE)
-      meteo_data <- read.csv(inFile, sep = ",", header = FALSE, row.names = 1, skip = 2)
-      colnames(meteo_data) = headers
+      rownames(meteo_data) <- meteo_data[,1]
       req(input$col1ID != input$col2ID)
-      
+      meteo_data[,"Empty"] <- NA 
+       
       meteo_data <- removeInvalid(meteo_data)
-      dataType <- getInputFile()[2]
-      if (dataType == "weekly" || dataType == "monthly") {  #TODO reformat
-        tab <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
-        dates <- tab[,1]
-        final <- cbind(dates,meteo_data[input$col1ID],meteo_data[input$col2ID])
+      if (dataType == "weekly" || dataType == "monthly") {  
+        final <- cbind(meteo_data[,1],meteo_data[input$col1ID],meteo_data[input$col2ID])
       } else {
         final <- cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])
       }
-      
-      if (dataType != "monthly"){ #TODO reformat
-        dygraph(final) %>%
-          dyRangeSelector() %>%
-          dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
-          dyAxis("y2", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = ""), independentTicks = TRUE) %>%
-          dySeries(input$col1ID, axis = second_axis) %>%
-          dyOptions(animatedZooms = TRUE) %>%
-          dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2)) %>%
-          dyLegend(show = "always") %>%
-          dyLimit(input$y_axis_label, color = "red")
+      graph <- dygraph(final) %>%
+        dyRangeSelector() %>%
+        dySeries(axis = second_axis, input$col2ID) %>%
+        dyOptions(animatedZooms = TRUE) %>%
+        dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2)) %>%
+        dyLegend(show = "always") %>%
+        dyLimit(input$y_axis_label, color = "red")
+      if (input$col2ID == "Empty") {  #show only one y axis TODO reformat
+        graph %>% dySeries(input$col1ID) %>%
+        dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = ""), independentTicks  = TRUE)
       } else {
-         dygraph(final) %>%
-          dyRangeSelector() %>%
-          dyAxis("y", label = paste(input$col2ID, " [" , units[input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
-          dyAxis("y2", label = paste(input$col1ID, " [" , units[input$col1ID], "]", sep = ""), independentTicks = TRUE) %>%
-          dySeries(input$col1ID, axis = second_axis) %>%
-          dyOptions(animatedZooms = TRUE) %>%
-          dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2)) %>%
-          dyLegend(show = "always") %>%
-          dyLimit(input$y_axis_label, color = "red") %>%
-          dyMultiColumn()
+        if (is.null(second_axis)) {
+          graph %>% dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "], ", input$col2ID, " [" , headers[2, input$col2ID], "]", sep = ""), independentTicks  = TRUE)
+        } else {
+          graph %>% dyAxis("y2", label = paste(input$col2ID, " [" , headers[2, input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
+            dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = ""), independentTicks = TRUE) 
+        }
       }
-
     }
   })
   
@@ -268,13 +251,6 @@ server <- function(input, output, clientData, session) {
       updateSliderInput(session, "boundary_set", min = 1, max = to, value = c(1 , to))  
     }
     req(input$boundary_set[1], input$boundary_set[2])
-  }
-  
-  isDateBased <- function(testDate) {
-    if (!is.numeric(testDate)) {
-      return(TRUE) 
-    }
-    return(FALSE)
   }
   
   ### Additional indormation
