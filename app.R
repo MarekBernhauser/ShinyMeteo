@@ -1,6 +1,5 @@
 library(shiny)
 library(dygraphs)
-library(lubridate)
 
 ### UI
 ui <- fluidPage(
@@ -14,6 +13,7 @@ ui <- fluidPage(
                               "Deciduous broadleaf forests at Štítná nad Vláří representing monoculture of European beech")),
       uiOutput("station"),
       radioButtons("graphType","Graph type", c("XY", "Time series")),
+      uiOutput("barGraphChoiceUI"),
       uiOutput("col1"),
       uiOutput("col2"),
       
@@ -26,7 +26,7 @@ ui <- fluidPage(
       uiOutput("showTimeDateSelect"),
       uiOutput("showNumSelect"),
       
-      checkboxInput("show_label", label = "Show label", value = FALSE),
+      checkboxInput("show_label", label = "Highlite y-axis value", value = FALSE),
       conditionalPanel(
         condition = "input.show_label == 1",
         numericInput("y_axis_label", label = "Value", 
@@ -69,6 +69,11 @@ server <- function(input, output, clientData, session) {
   
   output$station <- renderUI({
     selectInput("selectedFile", "Temporal reslution", choices = getChoices())
+  })
+  
+  output$barGraphChoiceUI <- renderUI({
+    if (input$graphType == "Time series")
+      radioButtons("graphSubtype","Graph Subtype", c("Line Graph", "Bar Graph"), selected = "Line Graph")
   })
   
   output$showTimeDateSelect <- renderUI({
@@ -127,7 +132,8 @@ server <- function(input, output, clientData, session) {
     colnames(meteo_data) = headers[1,]
     colnames(headers) <- headers[1,]
     
-    if(input$graphType == "XY"){    #XY graph
+    ###XY graph
+    if(input$graphType == "XY"){    
       if (dataType == "daily" || dataType == "half-hourly") {
         update_boundary_dates(min(levels(meteo_data[,1])), max(levels(meteo_data[,1]))) 
         startDate = input$boundary_date[1]
@@ -137,7 +143,6 @@ server <- function(input, output, clientData, session) {
         req(endDate > startDate)
         
         all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-        #TODO time 
         meteo_data <- meteo_data[(as.Date(levels(meteo_data$time)) %in% all_dates),]
       } else {
         update_boundary_set(min(meteo_data[1]), max(meteo_data[1]))
@@ -148,7 +153,6 @@ server <- function(input, output, clientData, session) {
         req(endDate > startDate)
         
         all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-        #TODO time 
         meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
       }
     if (nrow(meteo_data) > 1000) graphPointSize <- 2 else graphPointSize <- 3
@@ -165,8 +169,9 @@ server <- function(input, output, clientData, session) {
       dyLimit(input$y_axis_label, color = "red")
     }
     
-    
-    else if(input$graphType == "Time series"){   #Time series graph
+    ###Time series graph
+    else if(input$graphType == "Time series"){   
+      req(input$graphSubtype)
       rownames(meteo_data) <- meteo_data[,1]
       req(input$col1ID != input$col2ID)
       meteo_data[,"Empty"] <- NA 
@@ -177,23 +182,31 @@ server <- function(input, output, clientData, session) {
       } else {
         final <- cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])
       }
-      graph <- dygraph(final) %>%
+      
+      graph <- dygraph(final) %>%   #graph options
         dyRangeSelector() %>%
         dySeries(axis = second_axis, input$col2ID) %>%
         dyOptions(animatedZooms = TRUE) %>%
-        dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2)) %>%
         dyLegend(show = "always") %>%
-        dyLimit(input$y_axis_label, color = "red")
-      if (input$col2ID == "Empty") {  #show only one y axis TODO reformat
-        graph %>% dySeries(input$col1ID) %>%
+        dyLimit(input$y_axis_label, color = "red")# %>%
+      
+      if (input$col2ID == "Empty") {  #show only one y axis 
+        graph <- graph %>% dySeries(input$col1ID) %>%
         dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = ""), independentTicks  = TRUE)
       } else {
         if (is.null(second_axis)) {
-          graph %>% dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "], ", input$col2ID, " [" , headers[2, input$col2ID], "]", sep = ""), independentTicks  = TRUE)
+          graph <- graph %>% dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "], ", input$col2ID, " [" , headers[2, input$col2ID], "]", sep = ""), independentTicks  = TRUE)
         } else {
-          graph %>% dyAxis("y2", label = paste(input$col2ID, " [" , headers[2, input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
+          graph <- graph %>% dyAxis("y2", label = paste(input$col2ID, " [" , headers[2, input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
             dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = ""), independentTicks = TRUE) 
         }
+      }
+      if (input$graphSubtype == "Bar Graph" && dataType != "half-hourly") {      #show as bar graph
+        graph <- graph %>% dyMultiColumn() %>%
+        dyAxis("x", rangePad = 20)
+      }
+      else {
+        graph <- graph %>% dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2))
       }
     }
   })
@@ -229,6 +242,8 @@ server <- function(input, output, clientData, session) {
   observe({
     if(input$show_label == FALSE) {
       updateNumericInput(session, "y_axis_label", value = -9999)  
+    } else {
+      updateNumericInput(session, "y_axis_label", value = 0)  
     }
   })
   
@@ -285,8 +300,6 @@ server <- function(input, output, clientData, session) {
       <b>GPP-</b> Sum of gross primary production <br>"
     }
   })
-  
-  session$onSessionEnded(stopApp)#TODO maybe
 }
 
 set_second_axis <- function(input){
