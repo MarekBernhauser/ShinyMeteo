@@ -50,14 +50,6 @@ server <- function(input, output, clientData, session) {
                                  package = "dygraphs"))
   }
   
-  ### Barchart support
-  dyBarChart <- function(dygraph) {
-    dyPlotter(dygraph = dygraph,
-              name = "BarChart",
-              path = system.file("plotters/barchart.js",
-                                 package = "dygraphs"))
-  }
-  
   ### Choices for input files in dropdown menu
   getChoices <- reactive({
     switch (input$stationType,
