@@ -7,6 +7,10 @@ ui <- dashboardPage(skin = "purple",
   dashboardHeader(title = "Visualization of eddy-covariance data",titleWidth = 350),
   
   dashboardSidebar(
+    tags$head( tags$script(type="text/javascript",'$(document).ready(function(){
+                             $(".main-sidebar").css("height","100%");
+                             $(".main-sidebar .sidebar").css({"position":"relative","max-height": "100%","overflow": "auto"})
+                             })')),
     width = 350,
     div(style= "margin : 10px", h4("Data from three different ecosystem stations for year 2016 are available in four temporal resolutions")),
     selectInput("stationType", label = "Select ecosystem station", 
