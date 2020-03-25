@@ -1,5 +1,9 @@
+library(shiny)
+library(dygraphs)
+library(shinydashboard)
+
 ###UI
-ui <- dashboardPage(
+ui <- dashboardPage(skin = "purple",
   dashboardHeader(title = "Visualization of eddy-covariance data",titleWidth = 350),
   
   dashboardSidebar(
@@ -33,14 +37,18 @@ ui <- dashboardPage(
     conditionalPanel(
       condition = "input.show_Xlabel == 1",
       uiOutput("xLabel")
-    ),
-    
-    hr(),
-    div(strong("Additional information: "), htmlOutput("point", inline = TRUE), style= "margin : 10px")
+    )
   ),
+  
   dashboardBody(
-    #tags$head(tags$style(
-    #HTML('.wrapper {height: auto !important; position:relative; overflow-x:hidden; overflow-y:hidden}'))),
-    dygraphOutput("plot")
+    fluidRow(
+      box(status = "primary", width = 10000,
+        dygraphOutput("plot")
+      ),
+      tabBox(
+        tabPanel("Axis Information", htmlOutput("point", inline = TRUE)),
+        tabPanel("Locality Information", "Here can be some nice information about specific locality")
+      )
+    )
   )
 )

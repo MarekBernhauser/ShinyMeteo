@@ -1,3 +1,7 @@
+library(shiny)
+library(dygraphs)
+library(shinydashboard)
+
 ### Server
 server <- function(input, output, clientData, session) {
   ### Multicolumn barchart support
