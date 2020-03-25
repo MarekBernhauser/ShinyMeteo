@@ -29,9 +29,14 @@ ui <- fluidPage(
       checkboxInput("show_label", label = "Highlite y-axis value", value = FALSE),
       conditionalPanel(
         condition = "input.show_label == 1",
-        numericInput("y_axis_label", label = "Value", 
-                     value = NULL, min = -9999, max = 9999, step = 1)
+        numericInput("y_axis_label", label = "Value", value = NULL)
       ),
+      checkboxInput("show_Xlabel", label = "Highlite x-axis value", value = FALSE),
+      conditionalPanel(
+        condition = "input.show_Xlabel == 1",
+        uiOutput("xLabel")
+      ),
+      
       hr(),
       div(strong("Additional information: "), htmlOutput("point", inline = TRUE))
     ),
@@ -77,6 +82,14 @@ server <- function(input, output, clientData, session) {
   output$showNumSelect <- renderUI({ 
     if (input$graphType == "XY" && getInputFile()[2] %in% c("weekly", "monthly")) {
       sliderInput("boundary_set", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)
+    }
+  })
+  
+  output$xLabel <- renderUI({
+    if (getInputFile()[2] %in% c("weekly", "monthly") || input$graphType == "XY") {
+      numericInput("x_axis_label", label = "Value", value = NULL)
+    } else {
+      dateInput("x_axis_label", label = "Value", value = NULL)
     }
   })
   
@@ -126,6 +139,7 @@ server <- function(input, output, clientData, session) {
     
     ###XY graph
     if(input$graphType == "XY"){    
+      req(input$col2ID != "Empty")
       if (dataType == "daily" || dataType == "half-hourly") {
         update_boundary_dates(min(levels(meteo_data[,1])), max(levels(meteo_data[,1]))) 
         startDate = input$boundary_date[1]
@@ -152,13 +166,11 @@ server <- function(input, output, clientData, session) {
     req(dim(meteo_data)[1] > 0)
     meteo_data <- removeInvalid(meteo_data)
     
-    dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
-      dyRangeSelector() %>%
+    graph <- dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
       dyAxis("x", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = "")) %>%
       dyAxis("y", label = paste(input$col2ID, " [" , headers[2, input$col2ID], "]", sep = "")) %>%
       dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0, animatedZooms = TRUE) %>%
-      dyHighlight(highlightCircleSize = 5) %>%
-      dyLimit(input$y_axis_label, color = "red")
+      dyHighlight(highlightCircleSize = 5)
     }
     
     ###Time series graph
@@ -176,11 +188,9 @@ server <- function(input, output, clientData, session) {
       }
       
       graph <- dygraph(final) %>%   #graph options
-        dyRangeSelector() %>%
         dySeries(axis = second_axis, input$col2ID) %>%
         dyOptions(animatedZooms = TRUE) %>%
-        dyLegend(show = "always") %>%
-        dyLimit(input$y_axis_label, color = "red")# %>%
+        dyLegend(show = "always")
       
       if (input$col2ID == "Empty") {  #show only one y axis 
         graph <- graph %>% dySeries(input$col1ID) %>%
@@ -201,6 +211,17 @@ server <- function(input, output, clientData, session) {
         graph <- graph %>% dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2))
       }
     }
+    
+    ###Settings applying to both graphs
+    graph <- graph %>% dyRangeSelector()
+    
+    if (input$show_Xlabel == TRUE) {
+      graph <- graph %>% dyEvent(input$x_axis_label, color = "red")
+    }
+    if (input$show_label == TRUE) {
+      graph <- graph %>% dyLimit(input$y_axis_label, color = "red")
+    }
+    graph
   })
   
   ### Get location and type of input file
@@ -229,15 +250,6 @@ server <- function(input, output, clientData, session) {
     meteo_data[input$col2ID][meteo_data[input$col2ID] == -9999] <- NA
     return(meteo_data)
   }
-  
-  ### Remove label
-  observe({
-    if(input$show_label == FALSE) {
-      updateNumericInput(session, "y_axis_label", value = -9999)  
-    } else {
-      updateNumericInput(session, "y_axis_label", value = 0)  
-    }
-  })
   
   ### Update boudnary dates
   update_boundary_dates <- function(from,to) {   
