@@ -26,8 +26,13 @@ server <- function(input, output, clientData, session) {
   })
   
   output$barGraphChoiceUI <- renderUI({
-    if (input$graphType == "Time series")
-      radioButtons("graphSubtype","Graph Subtype", c("Line Graph", "Bar Graph"), selected = "Line Graph")
+    if (input$graphType == "Time series") {
+      if (getInputFile()[2] != "half-hourly")
+        radioButtons("graphSubtype","Graph Subtype", c("Line Graph", "Bar Graph"), selected = "Line Graph")
+      else
+        radioButtons("graphSubtype","Graph Subtype", c("Line Graph"), selected = "Line Graph")
+    }
+      
   })
   
   output$showTimeDateSelect <- renderUI({
@@ -118,7 +123,7 @@ server <- function(input, output, clientData, session) {
         all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
         meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
       }
-      if (nrow(meteo_data) > 1000) graphPointSize <- 2 else graphPointSize <- 3
+      if (nrow(meteo_data) > 1000) graphPointSize <- 1 else graphPointSize <- 3
       meteo_data <- meteo_data[order(meteo_data[input$col1ID]),]    #reorder to ascending order, required by dygraphs
       req(dim(meteo_data)[1] > 0)
       meteo_data <- removeInvalid(meteo_data)
@@ -126,8 +131,7 @@ server <- function(input, output, clientData, session) {
       graph <- dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
         dyAxis("x", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = "")) %>%
         dyAxis("y", label = paste(input$col2ID, " [" , headers[2, input$col2ID], "]", sep = "")) %>%
-        dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0, animatedZooms = TRUE) %>%
-        dyHighlight(highlightCircleSize = 5)
+        dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0)
     }
     
     ###Time series graph
@@ -164,9 +168,6 @@ server <- function(input, output, clientData, session) {
         graph <- graph %>% dyMultiColumn() %>%
           dyAxis("x", rangePad = 20)
       }
-      else {
-        graph <- graph %>% dyHighlight(highlightCircleSize = 5, highlightSeriesOpts = list(strokeWidth = 2))
-      }
     }
     
     ###Settings applying to both graphs
@@ -177,6 +178,9 @@ server <- function(input, output, clientData, session) {
     }
     if (input$show_label == TRUE) {
       graph <- graph %>% dyLimit(input$y_axis_label, color = "red")
+    }
+    if(nrow(meteo_data) < 1000) {
+      graph <- graph %>% dyHighlight(highlightCircleSize = 5)
     }
     graph
   })
