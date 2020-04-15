@@ -30,8 +30,7 @@ ui <- dashboardPage(skin = "purple",
     ),
     
     uiOutput("showTimeDateSelect"),
-    uiOutput("showNumSelect"),
-    
+
     checkboxInput("show_label", label = "Highlit y-axis value", value = FALSE),
     conditionalPanel(
       condition = "input.show_label == 1",

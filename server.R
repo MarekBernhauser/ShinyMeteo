@@ -4,6 +4,8 @@ library(shinydashboard)
 
 ### Server
 server <- function(input, output, clientData, session) {
+  values <- reactiveValues()
+  
   ### Multicolumn barchart support
   dyMultiColumn <- function(dygraph) {
     dyPlotter(dygraph = dygraph,
@@ -22,7 +24,7 @@ server <- function(input, output, clientData, session) {
   })
   
   output$station <- renderUI({
-    selectInput("selectedFile", "Temporal reslution", choices = getChoices())
+    selectInput("selectedFile", "Temporal resolution", choices = getChoices())
   })
   
   output$barGraphChoiceUI <- renderUI({
@@ -32,18 +34,14 @@ server <- function(input, output, clientData, session) {
       else
         radioButtons("graphSubtype","Graph Subtype", c("Line Graph"), selected = "Line Graph")
     }
-      
   })
   
   output$showTimeDateSelect <- renderUI({
     if (input$graphType == "XY" && getInputFile()[2] %in% c("daily", "half-hourly")) {
       dateRangeInput("boundary_date", label = "Date range", startview = "year", start = "1971-01-01", end = "1971-01-01")
     }
-  })
-  
-  output$showNumSelect <- renderUI({ 
-    if (input$graphType == "XY" && getInputFile()[2] %in% c("weekly", "monthly")) {
-      sliderInput("boundary_set", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)
+    else if (input$graphType == "XY" && getInputFile()[2] %in% c("weekly", "monthly")) {
+      sliderInput("boundary_date", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)
     }
   })
   
@@ -57,9 +55,7 @@ server <- function(input, output, clientData, session) {
   
   ### Get choices for x axis
   output$col1 <- renderUI({
-    inFile <- getInputFile()[1]
-    req(inFile)
-    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
+    headers <- values$headers[1,-1]
     if (input$graphType == "Time series") {
       myLabel <- "Y-axis"
     } else {
@@ -72,9 +68,7 @@ server <- function(input, output, clientData, session) {
   
   ### Get choices for y axis
   output$col2 <- renderUI({
-    inFile <- getInputFile()[1]
-    req(inFile)
-    headers = read.csv(inFile, sep = ",", header = FALSE, nrows = 1, as.is = TRUE, row.names = 1)
+    headers <- values$headers[1,-1]
     if (input$graphType == "Time series") {
       selectInput("col2ID", label = "Y2-axis",
                   choices = append("Empty", as.character(as.vector(headers[1,]))),
@@ -86,47 +80,66 @@ server <- function(input, output, clientData, session) {
     }
   })
   
-  ### Plot Create
-  output$plot <- renderDygraph({
-    second_axis <- set_second_axis(input$single_axis)  #'y2', or NULL if no second axis
-    
+  observeEvent(input$selectedFile, {
     fil <- getInputFile()
     inFile <- fil[1]
     dataType <- fil[2]
-    req(inFile)
+    
     headers <- read.csv(inFile, sep = ",", header = FALSE, nrows = 2, as.is = TRUE)
     meteo_data <- read.csv(inFile, sep = ",", header = FALSE, skip = 2)
     colnames(meteo_data) = headers[1,]
     colnames(headers) <- headers[1,]
+    
+    values$meteoData <- meteo_data
+    values$headers <- headers
+    values$dataType <- dataType
+    
+    if (dataType == "daily" || dataType == "half-hourly") {
+      start <- min(levels(meteo_data[,1]))
+      stop <- max(levels(meteo_data[,1]))
+      updateDateRangeInput(session, "boundary_date", start = start, end = stop)
+    } else if (dataType == "monthly" || dataType == "weekly") {
+      stop = max(meteo_data[1])
+      updateSliderInput(session, "boundary_date", min = 1, max = stop, value = c(1, stop))
+    }
+  })
+  
+  ### Plot Create
+  output$plot <- renderDygraph({
+    req(!is.null(input$col2ID))
+    req(!is.null(input$col1ID))
+    
+    second_axis <- set_second_axis(input$single_axis)  #'y2', or NULL if no second axis
+    isolate(meteo_data <- values$meteoData)
+    isolate(headers <- values$headers)
+    isolate(dataType <- values$dataType)
     
     ###XY graph
     if(input$graphType == "XY"){    
       req(input$col2ID != "Empty")
       if (dataType == "daily" || dataType == "half-hourly") {
         update_boundary_dates(min(levels(meteo_data[,1])), max(levels(meteo_data[,1]))) 
-        startDate = input$boundary_date[1]
-        req(startDate)
-        endDate = input$boundary_date[2]
-        req(endDate)
-        req(endDate > startDate)
-        
-        all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
-        meteo_data <- meteo_data[(as.Date(levels(meteo_data$time)) %in% all_dates),]
       } else {
         update_boundary_set(min(meteo_data[1]), max(meteo_data[1]))
-        startDate = input$boundary_set[1]
-        req(startDate)
-        endDate = input$boundary_set[2]
-        req(endDate)
-        req(endDate > startDate)
-        
-        all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
+      }
+      
+      startDate = input$boundary_date[1]
+      req(startDate)
+      endDate = input$boundary_date[2]
+      req(endDate)
+      req(endDate > startDate)
+      all_dates = seq(startDate, endDate, 1); #all dates between startDate and endDate
+      
+      if (dataType == "daily" || dataType == "half-hourly") {
+        meteo_data <- meteo_data[(as.Date(levels(meteo_data$time)) %in% all_dates),]
+      } else {
         meteo_data <- subset(meteo_data, meteo_data$time %in% all_dates) #get only the values for dates, that are in all_dates
       }
-      if (nrow(meteo_data) > 1000) graphPointSize <- 1 else graphPointSize <- 3
+      
       meteo_data <- meteo_data[order(meteo_data[input$col1ID]),]    #reorder to ascending order, required by dygraphs
       req(dim(meteo_data)[1] > 0)
       meteo_data <- removeInvalid(meteo_data)
+      if (nrow(meteo_data) > 1000) graphPointSize <- 1 else graphPointSize <- 3
       
       graph <- dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
         dyAxis("x", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = "")) %>%
@@ -136,6 +149,7 @@ server <- function(input, output, clientData, session) {
     
     ###Time series graph
     else if(input$graphType == "Time series"){   
+      reactiveTriggreHelper <- values$dataType
       req(input$graphSubtype)
       rownames(meteo_data) <- meteo_data[,1]
       req(input$col1ID != input$col2ID)
@@ -164,7 +178,7 @@ server <- function(input, output, clientData, session) {
             dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = ""), independentTicks = TRUE) 
         }
       }
-      if (input$graphSubtype == "Bar Graph" && dataType != "half-hourly") {      #show as bar graph
+      if (input$graphSubtype == "Bar Graph") {      #show as bar graph
         graph <- graph %>% dyMultiColumn() %>%
           dyAxis("x", rangePad = 20)
       }
@@ -172,7 +186,6 @@ server <- function(input, output, clientData, session) {
     
     ###Settings applying to both graphs
     graph <- graph %>% dyRangeSelector()
-    
     if (input$show_Xlabel == TRUE) {
       graph <- graph %>% dyEvent(input$x_axis_label, color = "red")
     }
@@ -222,15 +235,14 @@ server <- function(input, output, clientData, session) {
       updateDateRangeInput(session, "boundary_date", start = input$boundary_date[2], end = tmp)
     }
     #this was above IFs in previous version, but for some reason in new version it wasn't working and has to be here
-    updateDateRangeInput(session, "boundary_date", min = from, max = to) 
   }
   
   ### Update boudnary set
   update_boundary_set <- function(from,to) { 
-    if(is.null(input$boundary_set[1]) || input$boundary_set[1] == -1) {
-      updateSliderInput(session, "boundary_set", min = 1, max = to, value = c(1 , to))  
+    if(is.null(input$boundary_date[1]) || input$boundary_date[1] == -1) {
+      updateSliderInput(session, "boundary_date", min = 1, max = to, value = c(1 , to))  
     }
-    req(input$boundary_set[1], input$boundary_set[2])
+    req(input$boundary_date[1], input$boundary_date[2])
   }
   
   ### Additional indormation
