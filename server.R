@@ -5,6 +5,81 @@ library(shinydashboard)
 ### Server
 server <- function(input, output, clientData, session) {
   values <- reactiveValues()
+  values$clicks <- -1
+  ###
+  observeEvent(input$removeInput, {
+    #x <- "input2"
+    #r <- input[[x]]
+    if (values$clicks > -1) {
+      values$clicks <- values$clicks - 2
+    }
+  })
+  
+  output$allInputs <- renderUI({
+    input$appendInput
+    input$removeInput
+    isolate(values$clicks <- values$clicks + 1)
+    allInputs <- isolate(values$clicks)
+    req(!is.null(allInputs) && allInputs > 0)
+    inputTagList <- tagList()
+    choices <- values$headers[1,-1]
+    for (i in 1:allInputs){
+      inpID <- paste0("input", i)
+      inpLabel <- paste("Variable", i)
+      inpVal <- choices[1]
+      if (inpID %in% isolate(names(input))) {
+        isolate(inpVal <- input[[inpID]])
+      }
+      newInput <- selectInput(inpID, inpLabel, choices, selected=inpVal)
+      inputTagList <- tagAppendChild(inputTagList, newInput)
+    }
+    return(inputTagList) 
+  })
+  
+  output$center <- renderUI({
+    input$appendInput
+    input$removeInput
+    #isolate(values$clicks <- values$clicks + 1)
+    allInputs <- isolate(values$clicks)
+    req(!is.null(allInputs) && allInputs > 0)
+    inputTagList <- tagList()
+    choices <- choices <- c("<", "=", ">")
+    for (i in 1:allInputs){
+      inpID <- paste0("centerInp", i)
+      inpLabel <- paste("Operator", i)
+      inpVal <- choices[1]
+      if (inpID %in% isolate(names(input))) {
+        isolate(inpVal <- input[[inpID]])
+      }
+      newInput <- selectInput(inpID, inpLabel, choices, selected=inpVal)
+      inputTagList <- tagAppendChild(inputTagList, newInput)
+    }
+    return(inputTagList) 
+  })
+  
+  output$right <- renderUI({
+    input$appendInput
+    input$removeInput
+    #isolate(values$clicks <- values$clicks + 1)
+    allInputs <- isolate(values$clicks)
+    req(!is.null(allInputs) && allInputs > 0)
+    inputTagList <- tagList()
+    choices <- choices <- c("<", "=", ">")
+    for (i in 1:allInputs){
+      inpID <- paste0("rightInp", i)
+      inpLabel <- paste("Value", i)
+      inpVal <- choices[1]
+      if (inpID %in% isolate(names(input))) {
+        isolate(inpVal <- input[[inpID]])
+      }
+      newInput <- numericInput(inpID, inpLabel, value = 0)
+      inputTagList <- tagAppendChild(inputTagList, newInput)
+    }
+    return(inputTagList) 
+  })
+  ###
+  
+  
   
   ### Multicolumn barchart support
   dyMultiColumn <- function(dygraph) {
@@ -195,7 +270,7 @@ server <- function(input, output, clientData, session) {
     if(nrow(meteo_data) < 1000) {
       graph <- graph %>% dyHighlight(highlightCircleSize = 5)
     }
-    graph
+    return(graph)
   })
   
   ### Get location and type of input file
