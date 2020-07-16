@@ -41,14 +41,14 @@ ui <- dashboardPage(skin = "purple",
       condition = "input.show_Xlabel == 1",
       uiOutput("xLabel")
     ),
-    ###
+    
+    ### advanced filtering 
     div(style= "display:inline-block;width:32%;margin:0px;padding:0px;",uiOutput("allInputs")),
     div(style= "display:inline-block;width:32%;margin:0px;padding:0px;",uiOutput("center")),
     div(style= "display:inline-block;width:32%;margin:0px;padding:0px;",uiOutput("right")),
     div(style= "display:inline-block;text-align: center;",actionButton("appendInput", "Add")),
-    div(style= "display:inline-block;text-align: center;",actionButton("removeInput", "Remove")),
-    div(style= "display:inline-block;text-align: center;",actionButton("applyInput", "Apply"))
-    ###
+    div(style= "display:inline-block;text-align: center;",actionButton("removeInput", "Remove"))
+    
   ),
   
   dashboardBody(
@@ -58,7 +58,7 @@ ui <- dashboardPage(skin = "purple",
       ),
       tabBox(
         tabPanel("Axis Information", htmlOutput("point", inline = TRUE)),
-        tabPanel("Locality Information", "Here can be some nice information about specific locality")
+        tabPanel("Locality Information", htmlOutput("localityInfo", inline = TRUE))
       )
     )
   )

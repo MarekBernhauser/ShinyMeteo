@@ -6,7 +6,8 @@ library(shinydashboard)
 server <- function(input, output, clientData, session) {
   values <- reactiveValues()
   values$clicks <- -1
-  ###
+  
+  ### remove options in advanced filtering
   observeEvent(input$removeInput, {
     #x <- "input2"
     #r <- input[[x]]
@@ -15,35 +16,36 @@ server <- function(input, output, clientData, session) {
     }
   })
   
+  ### render UI to display dropdown options in advanced options
   output$allInputs <- renderUI({
     input$appendInput
     input$removeInput
     isolate(values$clicks <- values$clicks + 1)
     allInputs <- isolate(values$clicks)
     req(!is.null(allInputs) && allInputs > 0)
-    inputTagList <- tagList()
+    newInp <- tagList()
     choices <- values$headers[1,-1]
     for (i in 1:allInputs){
-      inpID <- paste0("input", i)
+      inpID <- paste0("leftInp", i)
       inpLabel <- paste("Variable", i)
       inpVal <- choices[1]
       if (inpID %in% isolate(names(input))) {
         isolate(inpVal <- input[[inpID]])
       }
       newInput <- selectInput(inpID, inpLabel, choices, selected=inpVal)
-      inputTagList <- tagAppendChild(inputTagList, newInput)
+      newInp <- tagAppendChild(newInp, newInput)
     }
-    return(inputTagList) 
+    return(newInp) 
   })
   
+  ### render UI to display compare operators
   output$center <- renderUI({
     input$appendInput
     input$removeInput
-    #isolate(values$clicks <- values$clicks + 1)
     allInputs <- isolate(values$clicks)
     req(!is.null(allInputs) && allInputs > 0)
-    inputTagList <- tagList()
-    choices <- choices <- c("<", "=", ">")
+    newInp <- tagList()
+    choices <- choices <- c(">", ">=" , "=", "<", "<=")
     for (i in 1:allInputs){
       inpID <- paste0("centerInp", i)
       inpLabel <- paste("Operator", i)
@@ -52,18 +54,18 @@ server <- function(input, output, clientData, session) {
         isolate(inpVal <- input[[inpID]])
       }
       newInput <- selectInput(inpID, inpLabel, choices, selected=inpVal)
-      inputTagList <- tagAppendChild(inputTagList, newInput)
+      newInp <- tagAppendChild(newInp, newInput)
     }
-    return(inputTagList) 
+    return(newInp) 
   })
   
+  ### render UI to display numeric input in advanced filtering
   output$right <- renderUI({
     input$appendInput
     input$removeInput
-    #isolate(values$clicks <- values$clicks + 1)
     allInputs <- isolate(values$clicks)
     req(!is.null(allInputs) && allInputs > 0)
-    inputTagList <- tagList()
+    newInp <- tagList()
     choices <- choices <- c("<", "=", ">")
     for (i in 1:allInputs){
       inpID <- paste0("rightInp", i)
@@ -73,13 +75,10 @@ server <- function(input, output, clientData, session) {
         isolate(inpVal <- input[[inpID]])
       }
       newInput <- numericInput(inpID, inpLabel, value = 0)
-      inputTagList <- tagAppendChild(inputTagList, newInput)
+      newInp <- tagAppendChild(newInp, newInput)
     }
-    return(inputTagList) 
+    return(newInp) 
   })
-  ###
-  
-  
   
   ### Multicolumn barchart support
   dyMultiColumn <- function(dygraph) {
@@ -98,10 +97,12 @@ server <- function(input, output, clientData, session) {
     )
   })
   
+  ### render UI for temporal resolutions
   output$station <- renderUI({
     selectInput("selectedFile", "Temporal resolution", choices = getChoices())
   })
   
+  ### render UI for graph subtypes
   output$barGraphChoiceUI <- renderUI({
     if (input$graphType == "Time series") {
       if (getInputFile()[2] != "half-hourly")
@@ -111,6 +112,7 @@ server <- function(input, output, clientData, session) {
     }
   })
   
+  ### render UI for date boundaries
   output$showTimeDateSelect <- renderUI({
     if (input$graphType == "XY" && getInputFile()[2] %in% c("daily", "half-hourly")) {
       dateRangeInput("boundary_date", label = "Date range", startview = "year", start = "1971-01-01", end = "1971-01-01")
@@ -119,6 +121,7 @@ server <- function(input, output, clientData, session) {
       sliderInput("boundary_date", "Range", min=-1, max=-1, value= c(-1,-1), step = 1)
     }
   })
+  
   
   output$xLabel <- renderUI({
     if (getInputFile()[2] %in% c("weekly", "monthly") || input$graphType == "XY") {
@@ -155,6 +158,7 @@ server <- function(input, output, clientData, session) {
     }
   })
   
+  ### process input file when changed
   observeEvent(input$selectedFile, {
     fil <- getInputFile()
     inFile <- fil[1]
@@ -168,7 +172,7 @@ server <- function(input, output, clientData, session) {
     values$meteoData <- meteo_data
     values$headers <- headers
     values$dataType <- dataType
-    
+
     if (dataType == "daily" || dataType == "half-hourly") {
       start <- min(levels(meteo_data[,1]))
       stop <- max(levels(meteo_data[,1]))
@@ -192,6 +196,7 @@ server <- function(input, output, clientData, session) {
     ###XY graph
     if(input$graphType == "XY"){    
       req(input$col2ID != "Empty")
+      meteo_data <- advancedFilter()
       if (dataType == "daily" || dataType == "half-hourly") {
         update_boundary_dates(min(levels(meteo_data[,1])), max(levels(meteo_data[,1]))) 
       } else {
@@ -273,6 +278,46 @@ server <- function(input, output, clientData, session) {
     return(graph)
   })
   
+  ### Advanced filtering
+  advancedFilter <- function() {
+    isolate(myData <- values$meteoData)
+    i <- 1
+    while(i <= values$clicks) {
+      left <- getLeftVal(i)
+      center <- getCenterVal(i)
+      right <- getRightVal(i)
+      req(left, center, right)
+      
+      switch (center,
+        "<" = myData <- subset(myData, get(left) < right),
+        "<=" = myData <- subset(myData, get(left) <= right),
+        "=" = myData <- subset(myData, get(left) == right),
+        ">" = myData <- subset(myData, get(left) > right),
+        ">=" = myData <- subset(myData, get(left) >= right)
+      )
+      i <- i + 1
+    }
+    return(myData)
+  }
+  
+  getLeftVal <- function(index) {
+    varName <- paste0("leftInp", index)
+    val <- input[[varName]]
+    return(val)
+  }
+  
+  getCenterVal <- function(index) {
+    varName <- paste0("centerInp", index)
+    val <- input[[varName]]
+    return(val)
+  }
+  
+  getRightVal <- function(index) {
+    varName <- paste0("rightInp", index)
+    val <- input[[varName]]
+    return(val)
+  }
+  
   ### Get location and type of input file
   getInputFile <- function() {  
     req(input$selectedFile)
@@ -297,6 +342,9 @@ server <- function(input, output, clientData, session) {
   removeInvalid <- function(meteo_data) {
     meteo_data[input$col1ID][meteo_data[input$col1ID] == -9999] <- NA
     meteo_data[input$col2ID][meteo_data[input$col2ID] == -9999] <- NA
+    if (input$graphType == "XY") {
+      meteo_data <- na.omit(meteo_data) 
+    }
     return(meteo_data)
   }
   
@@ -309,7 +357,6 @@ server <- function(input, output, clientData, session) {
       tmp <- input$boundary_date[1]
       updateDateRangeInput(session, "boundary_date", start = input$boundary_date[2], end = tmp)
     }
-    #this was above IFs in previous version, but for some reason in new version it wasn't working and has to be here
   }
   
   ### Update boudnary set
@@ -351,6 +398,17 @@ server <- function(input, output, clientData, session) {
       <b>Reco-</b> Sum of ecosystem respiration <br>
       <b>GPP-</b> Sum of gross primary production <br>"
     }
+  })
+  
+  ###Locality information under graph
+  output$localityInfo <- renderText({
+    switch (input$stationType,
+      "Agroecosystem at Křešín u Pacova with crops harvested during the growing season" = "Intensive agricultural field of different crops with long-term rotation, fluxnet site",
+      "Evergreen needleleaf forest at Rájec-Jestřebí representing monoculture of Norway spruce" = "Managed secondary pure Norway spruce mature stand growing on
+the nether border of its natural range of ecological occurrence",
+      "Deciduous broadleaf forests at Štítná nad Vláří representing monoculture of European beech" = "Managed even-aged European mature beech stand with tree species
+composition close to natural"
+    )
   })
   
   set_second_axis <- function(input){
