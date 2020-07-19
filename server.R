@@ -5,23 +5,23 @@ library(shinydashboard)
 ### Server
 server <- function(input, output, clientData, session) {
   values <- reactiveValues()
-  values$clicks <- -1
+  values$clicks <- 0
   
   ### remove options in advanced filtering
   observeEvent(input$removeInput, {
-    #x <- "input2"
-    #r <- input[[x]]
-    if (values$clicks > -1) {
-      values$clicks <- values$clicks - 2
+    if (values$clicks > 0) {
+      values$clicks <- values$clicks - 1
     }
+  })
+  
+  ### add options in advanced filtering
+  observeEvent(input$appendInput, {
+    values$clicks <- values$clicks + 1
   })
   
   ### render UI to display dropdown options in advanced options
   output$allInputs <- renderUI({
-    input$appendInput
-    input$removeInput
-    isolate(values$clicks <- values$clicks + 1)
-    allInputs <- isolate(values$clicks)
+    allInputs <- values$clicks
     req(!is.null(allInputs) && allInputs > 0)
     newInp <- tagList()
     choices <- values$headers[1,-1]
@@ -40,9 +40,7 @@ server <- function(input, output, clientData, session) {
   
   ### render UI to display compare operators
   output$center <- renderUI({
-    input$appendInput
-    input$removeInput
-    allInputs <- isolate(values$clicks)
+    allInputs <- values$clicks
     req(!is.null(allInputs) && allInputs > 0)
     newInp <- tagList()
     choices <- choices <- c(">", ">=" , "=", "<", "<=")
@@ -61,9 +59,7 @@ server <- function(input, output, clientData, session) {
   
   ### render UI to display numeric input in advanced filtering
   output$right <- renderUI({
-    input$appendInput
-    input$removeInput
-    allInputs <- isolate(values$clicks)
+    allInputs <- values$clicks
     req(!is.null(allInputs) && allInputs > 0)
     newInp <- tagList()
     choices <- choices <- c("<", "=", ">")
@@ -80,7 +76,7 @@ server <- function(input, output, clientData, session) {
     return(newInp) 
   })
   
-  ### Multicolumn barchart support
+  ### Multicolumn barchart support taken from https://rstudio.github.io/dygraphs/gallery-custom-plotters.html
   dyMultiColumn <- function(dygraph) {
     dyPlotter(dygraph = dygraph,
               name = "MultiColumn",
@@ -122,7 +118,7 @@ server <- function(input, output, clientData, session) {
     }
   })
   
-  
+  #render UI for date or numeric slector
   output$xLabel <- renderUI({
     if (getInputFile()[2] %in% c("weekly", "monthly") || input$graphType == "XY") {
       numericInput("x_axis_label", label = "Value", value = NULL)
@@ -172,6 +168,10 @@ server <- function(input, output, clientData, session) {
     values$meteoData <- meteo_data
     values$headers <- headers
     values$dataType <- dataType
+    
+    if (isolate(values$clicks) != 0) {  
+      values$clicks <- 0 #reset advanced filtering after file change, because some options might not be applicable for certain files
+    }
 
     if (dataType == "daily" || dataType == "half-hourly") {
       start <- min(levels(meteo_data[,1]))
@@ -221,7 +221,9 @@ server <- function(input, output, clientData, session) {
       meteo_data <- removeInvalid(meteo_data)
       if (nrow(meteo_data) > 1000) graphPointSize <- 1 else graphPointSize <- 3
       
-      graph <- dygraph(cbind(meteo_data[input$col1ID],meteo_data[input$col2ID])) %>%
+      final <- cbind(meteo_data[input$col1ID],meteo_data[input$col2ID]) #connect culumn
+      
+      graph <- dygraph(final) %>%
         dyAxis("x", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = "")) %>%
         dyAxis("y", label = paste(input$col2ID, " [" , headers[2, input$col2ID], "]", sep = "")) %>%
         dyOptions(drawPoints = TRUE, pointSize = graphPointSize, strokeWidth = 0)
@@ -233,7 +235,7 @@ server <- function(input, output, clientData, session) {
       req(input$graphSubtype)
       rownames(meteo_data) <- meteo_data[,1]
       req(input$col1ID != input$col2ID)
-      meteo_data[,"Empty"] <- NA 
+      meteo_data[,"Empty"] <- NA #add empty option
       
       meteo_data <- removeInvalid(meteo_data)
       if (dataType == "weekly" || dataType == "monthly") {  
@@ -251,7 +253,7 @@ server <- function(input, output, clientData, session) {
         graph <- graph %>% dySeries(input$col1ID) %>%
           dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "]", sep = ""), independentTicks  = TRUE)
       } else {
-        if (is.null(second_axis)) {
+        if (is.null(second_axis)) { #force both y axis on one
           graph <- graph %>% dyAxis("y", label = paste(input$col1ID, " [" , headers[2, input$col1ID], "], ", input$col2ID, " [" , headers[2, input$col2ID], "]", sep = ""), independentTicks  = TRUE)
         } else {
           graph <- graph %>% dyAxis("y2", label = paste(input$col2ID, " [" , headers[2, input$col2ID], "]", sep = ""), independentTicks  = TRUE) %>%
@@ -403,11 +405,11 @@ server <- function(input, output, clientData, session) {
   ###Locality information under graph
   output$localityInfo <- renderText({
     switch (input$stationType,
-      "Agroecosystem at Křešín u Pacova with crops harvested during the growing season" = "Intensive agricultural field of different crops with long-term rotation, fluxnet site",
+      "Agroecosystem at Křešín u Pacova with crops harvested during the growing season" = "Intensive agricultural field of different crops with long-term rotation, fluxnet site.",
       "Evergreen needleleaf forest at Rájec-Jestřebí representing monoculture of Norway spruce" = "Managed secondary pure Norway spruce mature stand growing on
-the nether border of its natural range of ecological occurrence",
+the nether border of its natural range of ecological occurrence.",
       "Deciduous broadleaf forests at Štítná nad Vláří representing monoculture of European beech" = "Managed even-aged European mature beech stand with tree species
-composition close to natural"
+composition close to natural."
     )
   })
   
